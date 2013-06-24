@@ -1,5 +1,5 @@
 int WIDTH = 640;
-int HEIGHT = 480;
+int HEIGHT = 400;
 float EXPLOSION_FRAME_INC = 1/3; 
 
 Vehicle v;
@@ -8,7 +8,7 @@ ParticleSystem[] brakePs = new ParticleSystem[2];
 PVector target;
 
 Animation explosion;
-PImage spritesheet;
+PImage bg;
 
 Maxim maxim;
 AudioPlayer accelPlayer;
@@ -19,6 +19,8 @@ void setup()
 {
   background(0);
   size(WIDTH, HEIGHT);
+  
+  bg = loadImage("grunge-danger-background-1280x2000.jpg");
   
   // sprite by mattalien
   PImage sprite = loadImage("Ford40GT.png");
@@ -36,8 +38,8 @@ void setup()
   
   accelPs[0] = new ParticleSystem(3, 255, -12);
   accelPs[1] = new ParticleSystem(3, 255, -12);
-  brakePs[0] = new ParticleSystem(1, 100, -1.5);
-  brakePs[1] = new ParticleSystem(1, 100, -1.5);
+  brakePs[0] = new ParticleSystem(1, 15, -1.5);
+  brakePs[1] = new ParticleSystem(1, 15, -1.5);
 
   v = new Vehicle(50, 50, sprite, accelPs, brakePs);
   target = new PVector(WIDTH - 50, HEIGHT - 50);
@@ -50,11 +52,13 @@ void setup()
 
 void draw()
 {
-  // clear screen and draw the boundary
+  // clear screen and draw the background
   fill(0);
   stroke(200);
   strokeWeight(1);
   rect(0, 0, WIDTH - 1, HEIGHT - 1);
+  imageMode(CORNER);
+  image(bg, 0, 0);
   
   // the car will chase our mouse
   target.x = mouseX;

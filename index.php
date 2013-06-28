@@ -69,6 +69,7 @@ function getProcessingSketchId () { return 'Motorero'; }
 			<h1>Motorero</h1>
     		<p id="description">Try to avoid the car.<br/>
 For sound, use Chrome.<br/>
+Based on code from http://natureofcode.com/<br/>
 (Development still in progress.)</p>
 			<p id="sources">Source code: <a href="Motorero.pde">Motorero</a> <a href="maxim.js">maxim.js</a> </p>
 			<p>

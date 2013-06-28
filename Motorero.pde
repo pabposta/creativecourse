@@ -1,6 +1,7 @@
 /**
 Try to avoid the car.<br/>
 For sound, use Chrome.<br/>
+Based on code from http://natureofcode.com/<br/>
 (Development still in progress.)
 **/
 

@@ -1,3 +1,9 @@
+/**
+Try to avoid the car.<br/>
+For sound, use Chrome.<br/>
+(Development still in progress.)
+**/
+
 int WIDTH = 640;
 int HEIGHT = 400;
 float EXPLOSION_FRAME_INC = 1/3; 
@@ -17,8 +23,9 @@ AudioPlayer explosionPlayer;
 
 void setup()
 {
+  size(640, 400);
   background(0);
-  size(WIDTH, HEIGHT);
+  noCursor();
   
   bg = loadImage("grunge-danger-background-1280x2000.jpg");
   
@@ -267,9 +274,13 @@ class PVector {
   
   void angle(PVector v) {
     float angle = v.heading() - heading();
-    if (angle < 0) {
-      angle += 2 * PI;
-    }  
+    // return value between -PI and PI
+    while (angle < -PI) {
+      angle += TWO_PI;
+    }
+    while (angle > PI) {
+      angle -= TWO_PI;
+    }
     return angle;
   }
   
@@ -394,6 +405,8 @@ class Vehicle {
   PImage sprite;
   ParticleSystem[] accelPs;
   ParticleSystem[] brakePs;
+  float mina = 10000;
+  float maxa = -10000;
   
   boolean braking;
  
@@ -425,31 +438,20 @@ class Vehicle {
     
     braking = false;
     
-    if (angle < PI/4 || angle > 7*PI/4) {
-      // accelerate and steer in the direction of the target
-      steer(angle);
+    // steer in the direction of the target
+    steer(angle);
+        
+    // accelerate if the target is in front of us
+    if (angle >= 0 && angle < PI/4 || angle < 0 && angle > -PI/4) {
       accelerate();
     }
-    else if (angle < PI/2) {
-      // just steer as hard as possible
-      steer(MAXSTEER);
-    }
-    else if (angle > 3*PI/2) {
-      // just steer as hard as possible
-      steer(2*PI - MAXSTEER);
-    }
-    else if (angle < PI) {
-      // brake and steer as hard as possible
-      steer(MAXSTEER);
+    // brake if it is behind us and we are not below minimum velocity
+    else if (abs(angle) > PI/2) {
       if (velocity.mag() > MINSPEED) {
         brake();
       }
     }
-    else {
-      // brake and steer as hard as possible
-      steer(2*PI - MAXSTEER);
-      brake();
-    }
+    
     if (!braking && velocity.mag() + ACCEL_FORCE < MINSPEED) {
       accelerate();
     }
@@ -475,7 +477,10 @@ class Vehicle {
   
   void brake() {
     acceleration.copy(orientation);
-    acceleration.mult(BRAKE_FORCE);
+    if (-velocity.mag() < BRAKE_FORCE) { 
+      acceleration.mult(BRAKE_FORCE);
+    }
+    
     // first wheel skid
     float originx = location.x - 16 * orientation.x - 5.5 * orientation.y;
     float originy = location.y - 16 * orientation.y + 5.5 * orientation.x;
@@ -490,23 +495,13 @@ class Vehicle {
   }
   
   void steer(float angle) {
-    if (angle < PI/2) {
-      if (angle > MAXSTEER) {
-        angle = MAXSTEER;
-      }
+    if (angle > MAXSTEER) {
+      angle = MAXSTEER;
     }
-    else {
-      if (2*PI - angle > MAXSTEER) {
-        angle = 2*PI - MAXSTEER;
-      }
+    else if (angle < -MAXSTEER) {
+      angle = -MAXSTEER;
     }
-    
-    if (angle <= PI) {
-      velocity.rotate(angle/2);
-    }
-    else {
-      velocity.rotate(2*PI + (angle - 2*PI) / 2);
-    }
+    velocity.rotate(angle/2);
   }
  
   void display() {

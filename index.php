@@ -51,6 +51,7 @@
 // convenience function to get the id attribute of generated sketch html element
 function getProcessingSketchId () { return 'Motorero'; }
 </script>
+<script src="inputField.js" type="text/javascript"></script>
 <script src="maxim.js" type="text/javascript"></script>
 
 	</head>
@@ -71,7 +72,7 @@ function getProcessingSketchId () { return 'Motorero'; }
 For sound, use Chrome.<br/>
 Based on code from http://natureofcode.com/<br/>
 (Development still in progress.)</p>
-			<p id="sources">Source code: <a href="Motorero.pde">Motorero</a> <a href="maxim.js">maxim.js</a> </p>
+			<p id="sources">Source code: <a href="Motorero.pde">Motorero</a> <a href="inputField.js">inputField.js</a> <a href="maxim.js">maxim.js</a> </p>
 			<p>
 			Built with <a href="http://processing.org" title="Processing">Processing</a>
 			and <a href="http://processingjs.org" title="Processing.js">Processing.js</a>

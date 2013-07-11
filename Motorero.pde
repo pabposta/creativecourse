@@ -5,22 +5,50 @@ Based on code from http://natureofcode.com/<br/>
 (Development still in progress.)
 **/
 
+// constants
 int WIDTH = 640;
 int HEIGHT = 400;
-float EXPLOSION_FRAME_INC = 1/3; 
+float EXPLOSION_FRAME_INC = 1/3;
+int SCREEN_TRANSITION_TIME = 5000; // in ms. toggle title screen/highscore screen
+// states
+int TITLE = 0;
+int SHOW_SCORE = 1;
+int ENTER_SCORE = 2;
+int PLAYING = 3;
 
+// object variables
 Vehicle v;
 ParticleSystem[] accelPs = new ParticleSystem[2];
 ParticleSystem[] brakePs = new ParticleSystem[2];
-PVector target;
-
+PVector target; // this is the mouse
 Animation explosion;
-PImage bg;
+Highscore highscore;
 
+// image variables
+PImage bg;
+PImage helmet;
+
+// font variables
+PFont titleFont;
+PFont subtitleFont;
+
+// state variables
+int lives;
+int state;
+boolean firstTime;
+boolean secondTime;
+int titleFade;
+int score;
+Timer screenTransition = new Timer(SCREEN_TRANSITION_TIME);
+
+// sound variables
 Maxim maxim;
 AudioPlayer accelPlayer;
 AudioPlayer brakePlayer;
 AudioPlayer explosionPlayer;
+
+
+//functions
 
 void setup()
 {
@@ -28,46 +56,164 @@ void setup()
   background(0);
   noCursor();
   
+  firstTime = true;
+  secondTime = false;  
+}
+
+// separate loading function so that we can call it from draw and display a loading screen. otherwise this does not seem possible. essentially replaces setup()
+void load() {    
+  // load images
   bg = loadImage("grunge-danger-background-1280x2000.jpg");
+  PImage sprite = loadImage("Ford40GT.png"); // sprite by mattalien
+  spritesheet = loadImage("explosion.png");
+  helmet = loadImage("blue_helmet_small.png");
   
-  // sprite by mattalien
-  PImage sprite = loadImage("Ford40GT.png");
-  
+  // load fonts
+  titleFont = createFont("Andalusian");
+  subtitleFont = createFont("Andalus");
+    
+  // load sounds
   maxim = new Maxim(this);
   accelPlayer = maxim.loadFile("engineloop.wav");
-  accelPlayer.setLooping(true);
-  accelPlayer.volume(0.5);
   brakePlayer = maxim.loadFile("car-brake-01.wav");
-  brakePlayer.setLooping(false);
-  brakePlayer.volume(0.25);
   explosionPlayer = maxim.loadFile("boom.wav");
-  explosionPlayer.setLooping(false);
-  explosionPlayer.volume(0.3);
   
+  // create objects
+  v = new Vehicle(0, 0, sprite, accelPs, brakePs);
+  target = new PVector(0, 0);
   accelPs[0] = new ParticleSystem(3, 255, -12);
   accelPs[1] = new ParticleSystem(3, 255, -12);
   brakePs[0] = new ParticleSystem(1, 15, -1.5);
   brakePs[1] = new ParticleSystem(1, 15, -1.5);
-
-  v = new Vehicle(50, 50, sprite, accelPs, brakePs);
-  target = new PVector(WIDTH - 50, HEIGHT - 50);
-  
-  spritesheet = loadImage("explosion.png");
   explosion = new Animation(spritesheet, 84, 74, 7, EXPLOSION_FRAME_INC, 0, 0);
+  highscore = new Highscore(subtitleFont);
   
-  playing = false;
+  // configure objects
+  brakePlayer.setLooping(false);
+  brakePlayer.volume(0.25);
+  explosionPlayer.setLooping(false);
+  explosionPlayer.volume(0.3);
+  
+  // update state
+  state = TITLE;
+  titleFade = 0;
+  score = -1; // no score yet
+  
+  // start screen transition timer
+  screenTransition.start();
 }
 
 void draw()
 {
-  // clear screen and draw the background
-  fill(0);
-  stroke(200);
-  strokeWeight(1);
-  rect(0, 0, WIDTH - 1, HEIGHT - 1);
+  // we want to display a loading screen (only possible from draw)
+  if (firstTime) {
+    textAlign(CENTER, CENTER);
+    text("Loading...", WIDTH / 2, HEIGHT / 2);
+    firstTime = false;
+    secondTime = true;
+    return;
+  }
+  // and then load everything
+  if (secondTime) {
+    load();
+    secondTime = false;
+  }
+  
+  // draw the background to clear screen
   imageMode(CORNER);
   image(bg, 0, 0);
   
+  // update game
+  switch (state) {
+    case TITLE:
+      titleScreen();
+      checkTimer(); // switch between title and highscore screens
+      break;
+    case SHOW_SCORE:
+      highscore.displayScores();
+      checkTimer(); // switch between title and highscore screens
+      break;
+    case ENTER_SCORE:
+      highscore.queryPlayerName();
+      // check if we are done enetring the name, and transition to showing the score, if so
+      if (!highscore.isActive()) {
+        state = SHOW_SCORE;
+        screenTransition.start();
+      }
+      break;
+    case PLAYING:
+      gameLoop();
+      break;
+  }
+  
+  // draw stuff
+  
+  // draw particles. let them fade even if the player is dead
+  brakePs[0].run();
+  brakePs[1].run();
+  if (state == PLAYING) {
+    v.display();
+  }
+  accelPs[0].run();
+  accelPs[1].run();
+  
+  // draw explosions. let explosion finish even when the player is dead
+  if (explosion.playing()) {
+    explosion.play();
+  }
+  
+  // display lives
+  for (int i = 0; i < lives; i++) {
+    image(helmet, i * 30 + 20, 20);
+  }
+  
+  // display score only if it has been set. a score of < 0 means that no score has been set yet
+  if (score > -1) {
+    displayScore();
+  }
+  
+  // draw the cape, but disable it for the title fade in
+  if (titleFade >= 255) {
+    drawCape();
+  }
+}
+
+void checkTimer() {
+  if (screenTransition.isFinished()) {
+    switch (state) {
+      case TITLE:
+        state = SHOW_SCORE;
+        break;
+      case SHOW_SCORE:
+        state = TITLE;
+        titleFade = 0;
+        break;
+    }
+    // restart timer
+    screenTransition.start();
+  }
+}
+
+void titleScreen() {
+  // show screen
+  // let the title fade in
+  fill(0, 0, 0, titleFade);
+  if (titleFade < 255) {
+    titleFade += 2;
+  }
+  textFont(titleFont, 64);
+  textAlign(CENTER, CENTER);
+  text("Motorero", WIDTH / 2, HEIGHT / 2);
+  // display click to start only after title has faded in
+  if (titleFade >= 255) {
+    fill(0, 210);
+    textFont(subtitleFont, 18);
+    textAlign(CENTER, CENTER);
+    text("Click mouse button to play", WIDTH / 2, HEIGHT / 2 + 44);
+  }
+}
+
+void gameLoop() {
   // the car will chase our mouse
   target.x = mouseX;
   target.y = mouseY;
@@ -75,36 +221,31 @@ void draw()
   // update the car
   v.seek(target);
   v.update();
-  v.display();
-  
-  // particle engines
-  brakePs[0].run();
-  brakePs[1].run();
-  accelPs[0].run();
-  accelPs[1].run();
-  
-  // draw the "cape"
-  stroke(255, 0, 0, 255);
-  fill(255, 0, 0, 100);
-  ellipse((int) target.x, (int) target.y, 30, 30);
-  
+    
   // check for collision
   if (!explosion.playing()) {
     float distance = PVector.sub(v.location, target);
     if (distance.mag() <= 25) {
+      // place explosion at edge of cape
       distance.normalize();
       distance.mult(15);
       distance.add(target);
       explosion.move(distance);
+      // reset and then play explosion animation and sound      
       explosion.reset();
       explosion.play();
       explosionPlayer.stop();
       explosionPlayer.play();
+      // player loses a life
+      loseLife();
     }
   }
   else {
     explosion.play();
   }
+  
+  // update score
+  updateScore();
   
   // sound
   // the engine sound depends on the car's speed
@@ -124,20 +265,82 @@ void draw()
   }
 }
 
-void mouseDragged()
-{
-// code that happens when the mouse moves
-// with the button down
+void displayScore() {
+  fill(36, 85, 160);
+  textFont(subtitleFont, 24);
+  textAlign(RIGHT, CENTER);
+  text(score, WIDTH - 10, 20);
 }
 
-void mousePressed()
-{
+void drawCape() {
+  stroke(255, 0, 0, 255);
+  fill(255, 0, 0, 100);
+  ellipse(mouseX, mouseY, 30, 30);
 }
 
-void mouseReleased()
+void mouseClicked()
 {
-// code that happens when the mouse button
-// is released
+  if (state == TITLE || state == SHOW_SCORE) {
+    newGame();
+  }
+}
+
+void newGame() {
+  state = PLAYING;
+  lives = 3;
+  score = 0;
+  accelPlayer.cue(0);
+  accelPlayer.setLooping(true); // because of a problem with looping sounds, this line needs to go here instead of setup
+  v.setLocation(0, 0); // reset car
+  titleFade = 255; // make sure we draw the cape (mouse cursor)
+  screenTransition.stop(); // stop the timer
+}
+
+void loseLife() {
+  lives--;
+  if (lives <= 0) {
+    die();
+  }
+}
+
+void die() {
+  // stop all running sounds
+  // a bug seems to prevent looping sounds from stopping the sound correctly in js. so instead, we set the acceleration to non-looping, stop it and then set it to looping again when a new game starts
+  accelPlayer.setLooping(false);
+  accelPlayer.stop();
+  brakePlayer.stop();
+  
+  // ask the highscore module if our score is a new highscore
+  if (highscore.isNewHighscore(score)) {
+    state = ENTER_SCORE;
+  }
+  else {
+    // go to highscore screen
+    state = SHOW_SCORE;
+    // restart timer
+    screenTransition.start();
+  }
+}
+
+void updateScore() {
+  // we score when we are in front of the car and close. the score is higher when:
+  // - the angle is smaller
+  // - the distance to the car is smaller
+  // - the car's speed is higher
+  int points = 0;
+  float angle = abs(v.orientation.angle(PVector.sub(target, v.location))); 
+  if (angle < PI/4) {
+    points += (int) ((PI/4 - angle) * 10);
+    int distance = (int) PVector.sub(target, v.location).mag();
+    if (distance < 120) {
+      points += (120 - distance);
+      float speed = v.velocity.mag(); 
+      if (speed > 1.5) {
+        points += (int) ((120 - distance) * speed);
+        score += points;
+      }
+    }
+  }
 }
 
 class Animation {
@@ -190,6 +393,138 @@ class Animation {
       image(spritesheet.get((int)current_frame * w, 0, w, h), x, y);
       current_frame += frameInc;
     }
+  }
+}
+class Highscore {
+  // constants
+  final String FILE = "scores.xml";
+  final int MAX_SCORE_LENGTH = 32;
+  
+  // small class to bundle score + player 
+  class Score implements Comparable {
+    String player;
+    int score;
+    
+    // constructor
+    Score(String player_, int score_) {
+      player = player_;
+      score = score_;
+    }
+    
+    // compare to be able to sort by score. sort is descending
+    int compareTo(Object o) {
+      Score other = (Score) o;
+      if (score < other.score) {
+        return 1;
+      }
+      else if (score == other.score) {
+        return 0;
+      }
+      else {
+        return -1;
+      }
+    }
+  }
+  
+  // keep the scores here
+  Scores[] scores;
+  // flag to see if the module is prompting the player for her name
+  boolean active;
+  // font we will use for display
+  PFont font;
+ 
+  // constructor
+  Highscore(PFont font_) {
+    loadFromDisk();
+    active = false;
+    font = font_;
+  }
+  
+  void loadFromDisk() {
+    println("1");
+    XML scoreFile = loadXML(FILE);
+    println("2");
+    XML[] scoreNodes = scoreFile.getChildren("score");
+    println("3");
+    
+    scores = new Scores[scoreNodes.length];
+    // read scores from file into array
+    for (int i = 0;  i < scoreNodes.length; i++) {
+      scores[i] = new Score(scoreNodes[i].getString("player"), scoreNodes[i].getContent());
+    }
+    println("4");
+    // sort descending
+    scores = sort(scores);
+    println("5");
+  }
+  
+  boolean isActive() {
+    return active;
+  }  
+  
+  // see if we have a new highscore. if so, the module will become active to ask the player for her name
+  boolean isNewHighscore(int newScore) {
+    // if there is no high score list, we cannot enter any points into it
+    if (scores.length > 0 && newScore > scores[scores.length - 1].score) {
+      // a new score. become active
+      active = true;
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+  
+  // save the score after the player has entered her name
+  void save(int score, String player) {
+    // replace the last score with the new one
+    scores[scores.length - 1] = new Score(player, score);
+    // sort again to put the new score in the correct position
+    scores = sort(scores);
+    // write to disk
+    saveToDisk();
+    // work is done, so deactivate
+    active = false;
+  }
+  
+  void saveToDisk() {
+    // build xml string
+    String xmlString = "<scores>";
+    for (int i = 0; i < scores.length; i++) {
+      xmlString += "<score player=\"" + scores[i].player + "\">" + scores[i].score + "</score>";
+    }
+    xmlString += "</scores>";
+    
+    // write to disk
+    XML xml = parseXML(xmlString);
+    saveXML(xml, FILE);
+  }
+  
+  void displayScores() {
+    // font properties
+    fill(36, 85, 160);
+    textFont(font, 32);
+    textAlign(CENTER, CENTER);
+    
+    // divide the screen height into equal pieces, where each score counts as 1 and the title counts as 2
+    int h = HEIGHT / (scores.length + 2);
+    int offset = h / 2;
+    
+    // draw title
+    text("Highscores", WIDTH / 2, h);
+    
+    // draw scores
+    textSize(24);
+    for (int i = 0; i < scores.length; i++) {
+      textAlign(LEFT, CENTER);
+      text(scores[i].player, WIDTH / 4, (i + 2) * h + offset);
+      textAlign(RIGHT, CENTER);
+      text(scores[i].score, WIDTH * 3 / 4, (i + 2) * h + offset);
+    }
+  }
+  
+  void queryPlayerName() {
+    active = false;
   }
 }
 class PVector {
@@ -391,6 +726,50 @@ class ParticleSystem {
     }
   }
 }
+// Learning Processing
+// Daniel Shiffman
+// http://www.learningprocessing.com
+
+// Example 10-5: Object-oriented timer
+
+class Timer {
+ 
+  int savedTime; // When Timer started
+  int totalTime; // How long Timer should last
+  boolean active; // is the timer enabled
+  
+  Timer(int tempTotalTime) {
+    totalTime = tempTotalTime;
+    active = false;
+  }
+  
+  // Starting the timer
+  void start() {
+    // When the timer starts it stores the current time in milliseconds.
+    savedTime = millis();
+    active = true; 
+  }
+  
+  // stop the timer
+  void stop() {
+    active = false;
+  }
+  
+  // The function isFinished() returns true if 5,000 ms have passed. 
+  // The work of the timer is farmed out to this method.
+  boolean isFinished() {
+    if (!active) {
+      return false;
+    } 
+    // Check how much time has passed
+    int passedTime = millis()- savedTime;
+    if (passedTime > totalTime) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
 class Vehicle {
  
   float MAXSPEED = 5;
@@ -420,6 +799,10 @@ class Vehicle {
     accelPs = accelPs_;
     brakePs = brakePs_;
     braking = false;
+  }
+  
+  void setLocation(float x, float y) {
+    location.set(x, y);
   }
  
   void update() {

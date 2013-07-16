@@ -9,7 +9,7 @@ Based on code from http://natureofcode.com/<br/>
 int WIDTH = 640;
 int HEIGHT = 400;
 float EXPLOSION_FRAME_INC = 1/3;
-int SCREEN_TRANSITION_TIME = 5000; // in ms. toggle title screen/highscore screen
+int SCREEN_TRANSITION_TIME = 8000; // in ms. toggle title screen/highscore screen
 // states
 int TITLE = 0;
 int SHOW_SCORE = 1;
@@ -399,6 +399,7 @@ class Highscore {
   // constants
   final String FILE = "scores.xml";
   final int MAX_SCORE_LENGTH = 32;
+  final String BASE_URL = "http://motorero.herokuapp.com/highscore.php";
   
   // small class to bundle score + player 
   class Score implements Comparable {
@@ -432,30 +433,38 @@ class Highscore {
   boolean active;
   // font we will use for display
   PFont font;
+  // input field in which the player enters her name
+  InputField inputField = new InputField();
+  // the new highscore a player has achieved and which will be uploaded after she enters her name
+  int scoreToUpload;
  
   // constructor
   Highscore(PFont font_) {
-    loadFromDisk();
+    loadFromStorage();
     active = false;
     font = font_;
   }
   
-  void loadFromDisk() {
-    println("1");
-    XML scoreFile = loadXML(FILE);
-    println("2");
-    XML[] scoreNodes = scoreFile.getChildren("score");
-    println("3");
-    
-    scores = new Scores[scoreNodes.length];
+  void loadFromStorage() {
+    // access server to get scores
+    String url = BASE_URL + "?method=get&number=10";
+    String[] scoreLines = loadStrings(url);
+    scores = new Scores[scoreLines.length];
+
     // read scores from file into array
-    for (int i = 0;  i < scoreNodes.length; i++) {
-      scores[i] = new Score(scoreNodes[i].getString("player"), scoreNodes[i].getContent());
+    for (int i = 0;  i < scoreLines.length; i++) {
+      // player and score are separated by comma
+      String[] elements = split(scoreLines[i], ",");
+      // the player name could have commas, so rejoin all elements except the last, which is the score
+      String[] temp = shorten(elements);
+      String player = join(temp, ",");
+      // score is the last value
+      int score = (int) elements[elements.length - 1];
+      // create the new score object entry 
+      scores[i] = new Score(player, score);
     }
-    println("4");
     // sort descending
     scores = sort(scores);
-    println("5");
   }
   
   boolean isActive() {
@@ -464,10 +473,14 @@ class Highscore {
   
   // see if we have a new highscore. if so, the module will become active to ask the player for her name
   boolean isNewHighscore(int newScore) {
+    // first, update the high score list
+    loadFromStorage();
     // if there is no high score list, we cannot enter any points into it
     if (scores.length > 0 && newScore > scores[scores.length - 1].score) {
       // a new score. become active
       active = true;
+      // update the new score to enter the highscore list
+      scoreToUpload = newScore;
       return true;
     }
     else {
@@ -475,29 +488,10 @@ class Highscore {
     }
   }
   
-  // save the score after the player has entered her name
-  void save(int score, String player) {
-    // replace the last score with the new one
-    scores[scores.length - 1] = new Score(player, score);
-    // sort again to put the new score in the correct position
-    scores = sort(scores);
-    // write to disk
-    saveToDisk();
-    // work is done, so deactivate
-    active = false;
-  }
-  
-  void saveToDisk() {
-    // build xml string
-    String xmlString = "<scores>";
-    for (int i = 0; i < scores.length; i++) {
-      xmlString += "<score player=\"" + scores[i].player + "\">" + scores[i].score + "</score>";
-    }
-    xmlString += "</scores>";
-    
-    // write to disk
-    XML xml = parseXML(xmlString);
-    saveXML(xml, FILE);
+  // save new high score on server
+  void saveToStorage(String player, int score) {
+    String url = BASE_URL + "?method=post&player=" + player + "&score=" + score;
+    Strings[] response = loadStrings(url);
   }
   
   void displayScores() {
@@ -523,8 +517,28 @@ class Highscore {
     }
   }
   
+  // manage state of html/js player name input
   void queryPlayerName() {
+    if (inputField.isHidden()) {
+      inputField.show();
+    }
+    if (inputField.isScoreSubmitted()) {
+      submitScore();
+    }
+  }
+  
+  // send score to server and deactivate name input
+  void submitScore() {
+    // get the player name
+    String player = inputField.getPlayer();
+    // upload the score
+    saveToStorage(player, scoreToUpload);
+    // load updated scoreboard
+    loadFromStorage();
+    // deactivate the input
     active = false;
+    // hide inputField
+    inputField.hide();
   }
 }
 class PVector {

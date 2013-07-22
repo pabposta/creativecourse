@@ -2,7 +2,6 @@
 Try to avoid the car.<br/>
 For sound, use Chrome.<br/>
 Based on code from http://natureofcode.com/<br/>
-(Development still in progress.)
 **/
 
 // constants
@@ -453,7 +452,7 @@ class Highscore {
   // constants
   final String FILE = "scores.xml";
   final int MAX_SCORE_LENGTH = 32;
-  final String BASE_URL = "http://127.0.0.1/highscore.php";
+  final String BASE_URL = "http://motorero.frogcp.com/highscore.php";
   
   // small class to bundle score + player 
   class Score implements Comparable {
@@ -583,22 +582,16 @@ class Highscore {
   
   // send score to server and deactivate name input
   void submitScore() {
-  println("1");
     // get the player name
     String player = inputField.getPlayer();
- println("2");
     // upload the score
     saveToStorage(player, scoreToUpload);
- println("3");
     // load updated scoreboard
     loadFromStorage();
- println("4");
     // deactivate the input
     active = false;
- println("5");
     // hide inputField
     inputField.hide();
-println("6");
   }
 }
 class PVector {

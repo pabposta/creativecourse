@@ -29,7 +29,7 @@ function InputField() {
     var tweetBtn = $('<a></a>')
         .addClass('twitter-share-button')
         .attr('href', 'http://twitter.com/share')
-        .attr('data-url', 'http://motorero.herokuapp.com')
+        .attr('data-url', 'http://motorero.frogcp.com')
         .attr('data-text',text)
         .attr('data-count', 'none')
         .attr('data-size', 'large');

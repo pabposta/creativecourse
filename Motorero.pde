@@ -10,6 +10,15 @@ int WIDTH = 640;
 int HEIGHT = 400;
 float EXPLOSION_FRAME_INC = 1/3;
 int SCREEN_TRANSITION_TIME = 8000; // in ms. toggle title screen/highscore screen
+// thresholds for ole bonus
+float OLE_SPEED_TH = 3.5;
+float OLE_ANGLE_TH = PI/4;
+float OLE_DISTANCE_TH = 40;
+// points awarded for ole
+int OLE_POINTS = 20000;
+// counter to maintain ole signal open for x frames
+int OLE_MAX_COUNTER = 2;
+
 // states
 int TITLE = 0;
 int SHOW_SCORE = 1;
@@ -40,12 +49,14 @@ boolean secondTime;
 int titleFade;
 int score;
 Timer screenTransition = new Timer(SCREEN_TRANSITION_TIME);
+boolean olePreGiven;
 
 // sound variables
 Maxim maxim;
 AudioPlayer accelPlayer;
 AudioPlayer brakePlayer;
 AudioPlayer explosionPlayer;
+AudioPlayer olePlayer;
 
 
 //functions
@@ -54,7 +65,6 @@ void setup()
 {
   size(640, 400);
   background(0);
-  noCursor();
   
   firstTime = true;
   secondTime = false;  
@@ -71,12 +81,13 @@ void load() {
   // load fonts
   titleFont = createFont("Andalusian");
   subtitleFont = createFont("Andalus");
-    
+  
   // load sounds
   maxim = new Maxim(this);
   accelPlayer = maxim.loadFile("engineloop.wav");
   brakePlayer = maxim.loadFile("car-brake-01.wav");
   explosionPlayer = maxim.loadFile("boom.wav");
+  olePlayer = maxim.loadFile("ole2.wav");
   
   // create objects
   v = new Vehicle(0, 0, sprite, accelPs, brakePs);
@@ -87,20 +98,25 @@ void load() {
   brakePs[1] = new ParticleSystem(1, 15, -1.5);
   explosion = new Animation(spritesheet, 84, 74, 7, EXPLOSION_FRAME_INC, 0, 0);
   highscore = new Highscore(subtitleFont);
-  
+
   // configure objects
   brakePlayer.setLooping(false);
   brakePlayer.volume(0.25);
   explosionPlayer.setLooping(false);
   explosionPlayer.volume(0.3);
-  
+  olePlayer.setLooping(false);
+  olePlayer.volume(0.4);
+
   // update state
   state = TITLE;
   titleFade = 0;
   score = -1; // no score yet
-  
+
   // start screen transition timer
   screenTransition.start();
+  
+  // turn off the cursor
+  noCursor();
 }
 
 void draw()
@@ -176,8 +192,13 @@ void draw()
   if (titleFade >= 255) {
     drawCape();
   }
+  
+  // ole. important to first check ole and then preconditions, as an ole depends on the current state and previous state
+  checkOle();
+  checkOlePre();
 }
 
+// check if the timer has finished and toggle state accordingly
 void checkTimer() {
   if (screenTransition.isFinished()) {
     switch (state) {
@@ -294,6 +315,7 @@ void newGame() {
   v.setLocation(0, 0); // reset car
   titleFade = 255; // make sure we draw the cape (mouse cursor)
   screenTransition.stop(); // stop the timer
+  olePreGiven = OLE_MAX_COUNTER; // at the start of the game, no ole preconditions are given
 }
 
 void loseLife() {
@@ -323,6 +345,11 @@ void die() {
 }
 
 void updateScore() {
+  // make sure that we are not dead already
+  if (!(state == PLAYING)) {
+    return;
+  }
+  
   // we score when we are in front of the car and close. the score is higher when:
   // - the angle is smaller
   // - the distance to the car is smaller
@@ -343,6 +370,33 @@ void updateScore() {
   }
 }
 
+// check if the conditions for a possible ole are given
+void checkOlePre() {
+  if (v.velocity.mag() > OLE_SPEED_TH) {
+    float angle = abs(v.orientation.angle(PVector.sub(target, v.location)));
+    if (angle < OLE_ANGLE_TH) {
+      int distance = (int) PVector.sub(target, v.location).mag();
+      if (distance < OLE_DISTANCE_TH) {
+        olePreGiven = OLE_MAX_COUNTER;
+        return;
+      }
+    }
+  }
+  if (olePreGiven > 0) {
+    olePreGiven--;
+  }
+}
+
+// check if an ole has been triggered
+void checkOle() {
+  if (state == PLAYING && olePreGiven > 0 && v.isBraking() && !explosion.playing()) {
+    // play sound
+    olePlayer.stop();
+    olePlayer.play();
+    // add score
+    score += OLE_POINTS;
+  }
+}
 class Animation {
   
   PImage spritesheet;
@@ -399,7 +453,7 @@ class Highscore {
   // constants
   final String FILE = "scores.xml";
   final int MAX_SCORE_LENGTH = 32;
-  final String BASE_URL = "http://motorero.herokuapp.com/highscore.php";
+  final String BASE_URL = "http://127.0.0.1/highscore.php";
   
   // small class to bundle score + player 
   class Score implements Comparable {
@@ -520,7 +574,7 @@ class Highscore {
   // manage state of html/js player name input
   void queryPlayerName() {
     if (inputField.isHidden()) {
-      inputField.show();
+      inputField.show(scoreToUpload);
     }
     if (inputField.isScoreSubmitted()) {
       submitScore();
@@ -529,16 +583,22 @@ class Highscore {
   
   // send score to server and deactivate name input
   void submitScore() {
+  println("1");
     // get the player name
     String player = inputField.getPlayer();
+ println("2");
     // upload the score
     saveToStorage(player, scoreToUpload);
+ println("3");
     // load updated scoreboard
     loadFromStorage();
+ println("4");
     // deactivate the input
     active = false;
+ println("5");
     // hide inputField
     inputField.hide();
+println("6");
   }
 }
 class PVector {

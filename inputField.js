@@ -1,6 +1,7 @@
 // pointer to the instance of the input field, so it can be accessed from HTML
 var inputFieldInstance;
 
+// class to handle the input field for the player name after a new highscore has been set. also handles the twitter button that goes with it
 function InputField() {
   
   // is the input field visible?
@@ -12,10 +13,29 @@ function InputField() {
   inputFieldInstance = this;
   
   // make the input Field visible
-  this.show = function() {
-    document.getElementById("scoreDialog").style.display = "block";
+  this.show = function(score) {
+    // input field
+    $("#scoreDialog").show();
     // set focus to the input field
-    document.getElementById("playerNameInput").focus();
+    $("#playerNameInput").focus();
+    
+    // twitter button
+    $("#tweetBtn").show();
+    // recreate it with the new highscore in the default text
+    // erase the old one first
+    $('#tweetBtn iframe').remove();
+    // create new one
+    var text = "I just achieved a new highscore of " + score + " at ";
+    var tweetBtn = $('<a></a>')
+        .addClass('twitter-share-button')
+        .attr('href', 'http://twitter.com/share')
+        .attr('data-url', 'http://motorero.herokuapp.com')
+        .attr('data-text',text)
+        .attr('data-count', 'none')
+        .attr('data-size', 'large');
+    $('#tweetBtn').append(tweetBtn);
+    twttr.widgets.load();
+    
     // update state variables
     hidden = false;
     scoreSubmitted = false;
@@ -23,14 +43,15 @@ function InputField() {
   
   // hide the input field
   this.hide = function() {
-    document.getElementById("scoreDialog").style.display = "none";
+     $("#scoreDialog").hide();
+     $("#tweetBtn").hide();
     // update state
     hidden = true;
   }
   
   // return the name the player has entered 
   this.getPlayer = function() {
-    return document.getElementById("playerNameInput").value;
+    return $("#playerNameInput").val();
   }
   
   // getters and setters for state
